@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkedIn Profile API</title>
+  <meta name="description" content="Turn LinkedIn profiles into structured JSON data instantly." />
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:          #070A13;
+      --surface:     #0D1220;
+      --surface2:    #111827;
+      --border:      rgba(255,255,255,0.08);
+      --border-h:    rgba(255,255,255,0.14);
+      --primary:     #6366f1;
+      --primary-h:   #4f52d9;
+      --primary-glow:rgba(99,102,241,0.25);
+      --cyan:        #22d3ee;
+      --emerald:     #10b981;
+      --amber:       #f59e0b;
+      --red:         #ef4444;
+      --txt:         #f1f5f9;
+      --txt2:        #94a3b8;
+      --txt3:        #64748b;
+      --radius:      14px;
+      --radius-sm:   8px;
+      --radius-lg:   20px;
+      font-size: 16px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--txt);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; border: none; outline: none; }
+    img { display: block; max-width: 100%; }
+    input { font-family: inherit; }
+
+    /* ─── Scrollbar ────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    /* ─── Background ───────────────────────────────────────────────────── */
+    .bg-layer {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      overflow: hidden;
+    }
+    .bg-blob {
+      position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.12;
+    }
+    .bg-blob-1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+      top: -200px; left: 50%; transform: translateX(-50%);
+    }
+    .bg-blob-2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #22d3ee 0%, transparent 70%);
+      bottom: 20%; right: -100px;
+    }
+    .bg-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ─── Navbar ───────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem;
+      height: 64px;
+      background: rgba(7,10,19,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1rem; letter-spacing: -0.01em;
+    }
+    .nav-logo-icon {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--primary), #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .nav-links {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .nav-links a {
+      padding: 6px 14px; border-radius: var(--radius-sm);
+      font-size: 0.875rem; color: var(--txt2);
+      transition: color 0.15s, background 0.15s;
+    }
+    .nav-links a:hover { color: var(--txt); background: rgba(255,255,255,0.05); }
+    .nav-links a.active { color: var(--txt); }
+    .nav-right {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .api-status-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.8rem; color: var(--txt2);
+      padding: 5px 12px; border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      white-space: nowrap;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--txt3);
+    }
+    .status-dot.online { background: var(--emerald); box-shadow: 0 0 6px var(--emerald); }
+    .status-dot.offline { background: var(--red); }
+    .btn-nav-docs {
+      padding: 7px 16px; border-radius: var(--radius-sm);
+      font-size: 0.8rem; font-weight: 500;
+      background: var(--surface2); color: var(--txt);
+      border: 1px solid var(--border);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-nav-docs:hover { background: rgba(255,255,255,0.06); border-color: var(--border-h); }
+
+    /* Mobile nav */
+    .nav-hamburger {
+      display: none; flex-direction: column; gap: 5px; padding: 8px;
+      background: none; border: none; cursor: pointer;
+    }
+    .nav-hamburger span {
+      display: block; width: 22px; height: 2px;
+      background: var(--txt2); border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .mobile-menu {
+      display: none; position: fixed; inset: 64px 0 0 0; z-index: 99;
+      background: rgba(7,10,19,0.97); backdrop-filter: blur(16px);
+      padding: 1.5rem 2rem;
+      flex-direction: column; gap: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      padding: 12px 16px; border-radius: var(--radius-sm);
+      font-size: 1rem; color: var(--txt2);
+      transition: color 0.15s, background 0.15s;
+    }
+    .mobile-menu a:hover { color: var(--txt); background: rgba(255,255,255,0.05); }
+    .mobile-menu-divider { height: 1px; background: var(--border); margin: 8px 0; }
+
+    /* ─── Sections ─────────────────────────────────────────────────────── */
+    section { position: relative; z-index: 1; }
+
+    /* ─── Hero ─────────────────────────────────────────────────────────── */
+    #home {
+      min-height: calc(100vh - 64px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 5rem 1.5rem 4rem;
+      text-align: center;
+    }
+    .hero-inner { max-width: 680px; width: 100%; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 100px;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.3);
+      font-size: 0.78rem; color: #a5b4fc; font-weight: 500;
+      margin-bottom: 2rem; letter-spacing: 0.02em;
+    }
+    .hero-badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--primary); flex-shrink: 0;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, #fff 40%, #a5b4fc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.1rem; color: var(--txt2); line-height: 1.7;
+      margin-bottom: 2.5rem; max-width: 520px; margin-left: auto; margin-right: auto;
+    }
+
+    /* ─── Input Card ────────────────────────────────────────────────────── */
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      text-align: left;
+      box-shadow: 0 0 0 0 transparent;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-card:focus-within {
+      border-color: rgba(99,102,241,0.5);
+      box-shadow: 0 0 0 4px var(--primary-glow);
+    }
+    .input-label {
+      display: block; font-size: 0.8rem; font-weight: 600;
+      color: var(--txt2); letter-spacing: 0.06em; text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+    .input-wrap {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0 1rem;
+      transition: border-color 0.2s;
+      margin-bottom: 0.5rem;
+    }
+    .input-wrap:focus-within { border-color: var(--primary); }
+    .input-icon { color: var(--txt3); font-size: 1rem; flex-shrink: 0; line-height: 1; }
+    #url-input {
+      flex: 1; background: none; border: none; outline: none;
+      color: var(--txt); font-size: 0.95rem; padding: 0.9rem 0;
+      min-width: 0;
+    }
+    #url-input::placeholder { color: var(--txt3); }
+    #url-input:focus { color: var(--txt); }
+    .input-clear {
+      background: none; border: none; padding: 4px; color: var(--txt3);
+      font-size: 1.1rem; line-height: 1; border-radius: 4px;
+      opacity: 0; pointer-events: none; transition: opacity 0.15s, color 0.15s;
+    }
+    .input-clear.visible { opacity: 1; pointer-events: auto; }
+    .input-clear:hover { color: var(--txt2); }
+    .input-helper { font-size: 0.78rem; color: var(--txt3); padding: 0 2px; }
+    .input-error {
+      font-size: 0.8rem; color: var(--red);
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      margin-top: 0.75rem; display: none;
+    }
+    .input-error.visible { display: block; }
+    .input-row-bottom {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; margin-top: 1.25rem; flex-wrap: wrap;
+    }
+    .hero-indicators {
+      display: flex; align-items: center; gap: 16px;
+      font-size: 0.78rem; color: var(--txt3); flex-shrink: 0;
+    }
+    .hero-ind-item { display: flex; align-items: center; gap: 5px; }
+
+    /* ─── Primary Button ────────────────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 0.75rem 1.5rem; border-radius: var(--radius);
+      background: var(--primary); color: #fff;
+      font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em;
+      border: 1px solid rgba(255,255,255,0.12);
+      transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+      white-space: nowrap; flex-shrink: 0;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-h);
+      box-shadow: 0 4px 28px rgba(99,102,241,0.45);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active:not(:disabled) { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-primary .arrow { transition: transform 0.15s; }
+    .btn-primary:hover:not(:disabled) .arrow { transform: translateX(3px); }
+    .spinner {
+      width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite; display: none; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-primary.loading .spinner { display: block; }
+    .btn-primary.loading .arrow { display: none; }
+
+    /* ─── Features Section ──────────────────────────────────────────────── */
+    #features {
+      padding: 5rem 1.5rem;
+      max-width: 1100px; margin: 0 auto;
+    }
+    .section-header { text-align: center; margin-bottom: 3rem; }
+    .section-label {
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--primary); margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 700; letter-spacing: -0.02em; color: var(--txt);
+      margin-bottom: 0.75rem;
+    }
+    .section-sub { font-size: 1rem; color: var(--txt2); max-width: 500px; margin: 0 auto; }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover { border-color: var(--border-h); transform: translateY(-2px); }
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; margin-bottom: 1rem;
+      background: rgba(99,102,241,0.1);
+    }
+    .feature-card:nth-child(2) .feature-icon { background: rgba(34,211,238,0.1); }
+    .feature-card:nth-child(3) .feature-icon { background: rgba(16,185,129,0.1); }
+    .feature-card:nth-child(4) .feature-icon { background: rgba(245,158,11,0.1); }
+    .feature-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .feature-desc { font-size: 0.85rem; color: var(--txt2); line-height: 1.6; }
+
+    /* ─── How It Works ──────────────────────────────────────────────────── */
+    #howitworks {
+      padding: 5rem 1.5rem;
+      max-width: 900px; margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+    .steps-row {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0; position: relative;
+    }
+    .steps-row::before {
+      content: '';
+      position: absolute; top: 32px; left: calc(100%/6); right: calc(100%/6);
+      height: 1px; background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      opacity: 0.4; pointer-events: none;
+    }
+    .step { text-align: center; padding: 0 1.5rem; position: relative; }
+    .step-num {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 700; color: var(--primary);
+      margin: 0 auto 1.25rem; letter-spacing: 0.02em;
+      position: relative; z-index: 1;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .step:hover .step-num { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-glow); }
+    .step-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .step-desc { font-size: 0.85rem; color: var(--txt2); line-height: 1.6; }
+
+    /* ─── Profile Results ───────────────────────────────────────────────── */
+    #results {
+      max-width: 860px; margin: 0 auto; padding: 0 1.5rem 5rem;
+      display: none;
+    }
+    #results.visible { display: block; }
+
+    /* success bar */
+    .success-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: var(--radius-sm);
+      background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);
+      color: var(--emerald); font-size: 0.85rem; font-weight: 500;
+      margin-bottom: 1.5rem; animation: fadeIn 0.3s ease;
+    }
+
+    /* Profile header */
+    .profile-header-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 2rem;
+      display: flex; gap: 1.5rem; align-items: flex-start;
+      margin-bottom: 1rem; animation: fadeInUp 0.35s ease;
+    }
+    .avatar {
+      width: 80px; height: 80px; border-radius: 50%; flex-shrink: 0;
+      object-fit: cover; border: 2px solid var(--border);
+    }
+    .avatar-initials {
+      width: 80px; height: 80px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--primary), #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 700; color: #fff;
+      border: 2px solid rgba(99,102,241,0.4);
+    }
+    .profile-meta { flex: 1; min-width: 0; }
+    .profile-name {
+      font-size: 1.4rem; font-weight: 700; letter-spacing: -0.01em;
+      margin-bottom: 0.3rem;
+    }
+    .profile-headline { color: var(--txt2); font-size: 0.95rem; margin-bottom: 0.5rem; }
+    .profile-location {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.83rem; color: var(--txt3);
+    }
+    .profile-actions { margin-top: 1rem; }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: var(--radius-sm);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--txt2); font-size: 0.82rem; font-weight: 500;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .btn-secondary:hover { color: var(--txt); border-color: var(--border-h); background: rgba(255,255,255,0.05); }
+
+    /* Stats row */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 0.75rem; margin-bottom: 1.5rem; animation: fadeInUp 0.4s ease 0.05s both;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem;
+      text-align: center;
+    }
+    .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--primary); line-height: 1; margin-bottom: 0.3rem; }
+    .stat-label { font-size: 0.72rem; color: var(--txt3); text-transform: uppercase; letter-spacing: 0.07em; }
+
+    /* Section card */
+    .result-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); margin-bottom: 1rem;
+      overflow: hidden; animation: fadeInUp 0.4s ease both;
+    }
+    .result-section:nth-child(4) { animation-delay: 0.08s; }
+    .result-section:nth-child(5) { animation-delay: 0.12s; }
+    .result-section:nth-child(6) { animation-delay: 0.16s; }
+    .result-section:nth-child(7) { animation-delay: 0.20s; }
+    .result-section:nth-child(8) { animation-delay: 0.24s; }
+    .result-section:nth-child(9) { animation-delay: 0.28s; }
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-head-left { display: flex; align-items: center; gap: 10px; }
+    .section-head-icon { font-size: 1rem; }
+    .section-head-title { font-size: 0.9rem; font-weight: 600; }
+    .section-head-count {
+      font-size: 0.75rem; color: var(--txt3);
+      background: var(--surface2); padding: 2px 8px; border-radius: 100px;
+      border: 1px solid var(--border);
+    }
+    .section-body { padding: 1.25rem 1.5rem; }
+
+    /* About */
+    .about-text { font-size: 0.92rem; color: var(--txt2); line-height: 1.75; }
+
+    /* Timeline */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-item { display: flex; gap: 1rem; position: relative; padding-bottom: 1.5rem; }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .timeline-left { display: flex; flex-direction: column; align-items: center; gap: 0; flex-shrink: 0; }
+    .timeline-dot {
+      width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--primary);
+      background: var(--bg); flex-shrink: 0; margin-top: 5px;
+    }
+    .timeline-line {
+      flex: 1; width: 1px; background: var(--border); min-height: 20px; margin-top: 4px;
+    }
+    .timeline-item:last-child .timeline-line { display: none; }
+    .timeline-content { flex: 1; padding-top: 2px; }
+    .timeline-dates {
+      font-size: 0.75rem; color: var(--primary); font-weight: 600;
+      letter-spacing: 0.03em; margin-bottom: 4px;
+    }
+    .timeline-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 2px; }
+    .timeline-company { font-size: 0.85rem; color: var(--txt2); margin-bottom: 2px; }
+    .timeline-location { font-size: 0.78rem; color: var(--txt3); margin-bottom: 6px; }
+    .timeline-desc { font-size: 0.83rem; color: var(--txt2); line-height: 1.65; }
+
+    /* Education cards */
+    .edu-grid { display: flex; flex-direction: column; gap: 1rem; }
+    .edu-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+    }
+    .edu-institution { font-size: 0.92rem; font-weight: 600; margin-bottom: 3px; }
+    .edu-degree { font-size: 0.83rem; color: var(--txt2); margin-bottom: 2px; }
+    .edu-dates { font-size: 0.75rem; color: var(--txt3); }
+
+    /* Skills */
+    .skills-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+    .skill-pill {
+      padding: 5px 14px; border-radius: 100px;
+      background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2);
+      font-size: 0.82rem; color: #a5b4fc; font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .skill-pill:hover { background: rgba(99,102,241,0.16); border-color: rgba(99,102,241,0.4); }
+
+    /* Certifications */
+    .cert-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+    .cert-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+    }
+    .cert-name { font-size: 0.9rem; font-weight: 600; margin-bottom: 3px; }
+    .cert-issuer { font-size: 0.8rem; color: var(--txt2); }
+    .cert-dates { font-size: 0.75rem; color: var(--txt3); white-space: nowrap; flex-shrink: 0; }
+    .cert-link {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 0.75rem; color: var(--primary);
+      padding: 3px 8px; border-radius: 4px;
+      border: 1px solid rgba(99,102,241,0.2);
+      transition: background 0.15s;
+      margin-top: 4px;
+    }
+    .cert-link:hover { background: rgba(99,102,241,0.1); }
+
+    /* Languages */
+    .lang-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .lang-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.75rem 1rem;
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 120px;
+    }
+    .lang-name { font-size: 0.88rem; font-weight: 600; }
+    .lang-prof { font-size: 0.75rem; color: var(--txt3); }
+
+    /* Empty states */
+    .empty-state {
+      text-align: center; padding: 1.5rem; color: var(--txt3);
+      font-size: 0.85rem;
+    }
+    .empty-state-icon { font-size: 1.5rem; margin-bottom: 0.5rem; opacity: 0.4; }
+
+    /* Raw JSON */
+    .raw-json-toggle {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.5rem; background: none; border: none; color: var(--txt2);
+      font-size: 0.85rem; font-weight: 500; cursor: pointer;
+      transition: color 0.15s;
+    }
+    .raw-json-toggle:hover { color: var(--txt); }
+    .raw-json-toggle-icon { transition: transform 0.2s; font-size: 0.7rem; }
+    .raw-json-toggle.open .raw-json-toggle-icon { transform: rotate(180deg); }
+    .raw-json-body {
+      display: none; border-top: 1px solid var(--border);
+      padding: 1.25rem 1.5rem;
+    }
+    .raw-json-body.open { display: block; }
+    .raw-json-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
+    .btn-copy {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--txt2); font-size: 0.78rem; font-weight: 500;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-copy:hover { color: var(--txt); border-color: var(--border-h); }
+    .btn-copy.copied { color: var(--emerald); border-color: rgba(16,185,129,0.3); }
+    pre#raw-json {
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1rem 1.25rem; font-size: 0.78rem; line-height: 1.7;
+      overflow-x: auto; color: var(--txt2); font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      max-height: 400px;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--txt); font-size: 0.85rem; padding: 10px 18px;
+      border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: flex; align-items: center; gap: 8px;
+      opacity: 0; transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* Loading */
+    #loading {
+      max-width: 860px; margin: 0 auto; padding: 0 1.5rem 3rem;
+      display: none; text-align: center;
+    }
+    #loading.visible { display: block; }
+    .loading-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 3rem;
+    }
+    .loading-spinner-lg {
+      width: 48px; height: 48px; border: 3px solid rgba(99,102,241,0.15);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.9s linear infinite; margin: 0 auto 1.5rem;
+    }
+    .loading-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .loading-sub { font-size: 0.85rem; color: var(--txt3); }
+    .loading-steps { margin-top: 2rem; text-align: left; max-width: 280px; margin-left: auto; margin-right: auto; }
+    .loading-step {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.82rem; padding: 6px 0; color: var(--txt3);
+      transition: color 0.3s;
+    }
+    .loading-step.done { color: var(--emerald); }
+    .loading-step.active { color: var(--txt); }
+    .loading-step-icon { font-size: 0.8rem; width: 16px; text-align: center; flex-shrink: 0; }
+
+    /* Error */
+    #error-state {
+      max-width: 860px; margin: 0 auto; padding: 0 1.5rem 3rem;
+      display: none;
+    }
+    #error-state.visible { display: block; }
+    .error-card {
+      background: var(--surface); border: 1px solid rgba(239,68,68,0.2);
+      border-radius: var(--radius-lg); padding: 3rem; text-align: center;
+    }
+    .error-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .error-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .error-message { font-size: 0.88rem; color: var(--txt2); margin-bottom: 1.5rem; max-width: 360px; margin-left: auto; margin-right: auto; }
+    .btn-retry {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: var(--radius-sm);
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red); font-size: 0.85rem; font-weight: 500;
+      transition: background 0.15s;
+    }
+    .btn-retry:hover { background: rgba(239,68,68,0.18); }
+
+    /* Footer */
+    footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .footer-left { font-size: 0.82rem; color: var(--txt3); }
+    .footer-right { display: flex; align-items: center; gap: 16px; }
+    .footer-right a { font-size: 0.82rem; color: var(--txt3); transition: color 0.15s; }
+    .footer-right a:hover { color: var(--txt2); }
+
+    /* Separator */
+    .sep { height: 1px; background: var(--border); margin: 0; }
+
+    /* Animations */
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes fadeInUp {
+      from { opacity:0; transform: translateY(16px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.5s ease; }
+
+    /* ─── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+      .btn-nav-docs { display: none; }
+      .api-status-badge { display: none; }
+
+      .stats-row { grid-template-columns: repeat(3, 1fr); }
+      .stats-row .stat-card:nth-child(4),
+      .stats-row .stat-card:nth-child(5) { display: none; }
+
+      .steps-row { grid-template-columns: 1fr; gap: 2rem; }
+      .steps-row::before { display: none; }
+
+      .profile-header-card { flex-direction: column; }
+      .avatar, .avatar-initials { width: 64px; height: 64px; font-size: 1.2rem; }
+
+      .cert-card { flex-direction: column; }
+
+      .input-row-bottom { flex-direction: column; align-items: stretch; }
+      .btn-primary { width: 100%; justify-content: center; }
+      .hero-indicators { justify-content: center; }
+    }
+    @media (max-width: 480px) {
+      h1 { font-size: 1.9rem; }
+      .hero-sub { font-size: 0.95rem; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .stats-row .stat-card:nth-child(3) { display: none; }
+      #home { padding: 3rem 1rem 3rem; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
+      .feature-card { padding: 1.1rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-layer" aria-hidden="true">
+  <div class="bg-grid"></div>
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+</div>
+
+<!-- Navbar -->
+<nav role="navigation" aria-label="Main navigation">
+  <a href="#home" class="nav-logo" aria-label="LinkedIn Profile API home">
+    <div class="nav-logo-icon" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    </div>
+    <span>LinkedIn Profile API</span>
+  </a>
+
+  <div class="nav-links" role="list">
+    <a href="#home" class="active" role="listitem">Home</a>
+    <a href="#analyze" role="listitem">Analyze</a>
+    <a href="/docs" target="_blank" rel="noopener" role="listitem">API Docs</a>
+  </div>
+
+  <div class="nav-right">
+    <div class="api-status-badge" id="nav-api-status" aria-live="polite" aria-label="API status">
+      <span class="status-dot" id="nav-status-dot" aria-hidden="true"></span>
+      <span id="nav-status-text">Checking…</span>
+    </div>
+    <a href="/docs" target="_blank" rel="noopener" class="btn-nav-docs">API Docs ↗</a>
+    <button class="nav-hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile Menu -->
+<div class="mobile-menu" id="mobile-menu" role="menu" aria-label="Mobile navigation">
+  <a href="#home" role="menuitem">Home</a>
+  <a href="#analyze" role="menuitem">Analyze</a>
+  <a href="/docs" target="_blank" rel="noopener" role="menuitem">API Docs ↗</a>
+  <div class="mobile-menu-divider"></div>
+  <div class="api-status-badge" style="justify-content:center;" aria-live="polite">
+    <span class="status-dot" id="mobile-status-dot" aria-hidden="true"></span>
+    <span id="mobile-status-text">Checking API…</span>
+  </div>
+</div>
+
+<!-- ── HERO ────────────────────────────────────────────────────────────── -->
+<section id="home">
+  <div class="hero-inner fade-in">
+    <div class="hero-badge">
+      <span class="hero-badge-dot" aria-hidden="true"></span>
+      Developer API · Structured Profile Data
+    </div>
+
+    <h1>Turn LinkedIn Profiles<br>Into Structured Data</h1>
+    <p class="hero-sub">
+      Paste any public LinkedIn profile URL and get clean, structured professional data — experience, education, skills and more — in seconds.
+    </p>
+
+    <!-- Input Card -->
+    <div class="input-card" id="analyze">
+      <label class="input-label" for="url-input">LinkedIn Profile URL</label>
+
+      <div class="input-wrap" role="group" aria-label="URL input area">
+        <span class="input-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </span>
+        <input
+          type="url"
+          id="url-input"
+          placeholder="https://www.linkedin.com/in/example/"
+          aria-label="LinkedIn profile URL"
+          aria-describedby="url-helper url-error"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="input-clear" id="input-clear" aria-label="Clear input" tabindex="-1">×</button>
+      </div>
+
+      <p id="url-helper" class="input-helper">Enter a public LinkedIn profile URL</p>
+      <div id="url-error" class="input-error" role="alert" aria-live="polite"></div>
+
+      <div class="input-row-bottom">
+        <div class="hero-indicators" aria-hidden="true">
+          <span class="hero-ind-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <span id="hero-api-status-text">API Operational</span>
+          </span>
+          <span class="hero-ind-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Secure
+          </span>
+        </div>
+
+        <button class="btn-primary" id="analyze-btn" type="button" aria-label="Analyze LinkedIn profile">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-text">Analyze Profile</span>
+          <span class="arrow" aria-hidden="true">→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LOADING ─────────────────────────────────────────────────────────── -->
+<div id="loading" aria-live="polite" aria-label="Loading profile data">
+  <div class="loading-card">
+    <div class="loading-spinner-lg" aria-hidden="true"></div>
+    <div class="loading-title">Analyzing profile…</div>
+    <div class="loading-sub">Retrieving and structuring profile data</div>
+    <div class="loading-steps" aria-hidden="true">
+      <div class="loading-step done" id="ls-1">
+        <span class="loading-step-icon">✓</span> Validating URL
+      </div>
+      <div class="loading-step active" id="ls-2">
+        <span class="loading-step-icon">●</span> Retrieving profile data
+      </div>
+      <div class="loading-step" id="ls-3">
+        <span class="loading-step-icon">○</span> Structuring information
+      </div>
+      <div class="loading-step" id="ls-4">
+        <span class="loading-step-icon">○</span> Preparing results
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ERROR STATE ─────────────────────────────────────────────────────── -->
+<div id="error-state" role="alert">
+  <div class="error-card">
+    <div class="error-icon" id="error-icon" aria-hidden="true">⚠️</div>
+    <div class="error-title" id="error-title">Something went wrong</div>
+    <p class="error-message" id="error-message">Please try again.</p>
+    <button class="btn-retry" id="retry-btn" type="button">
+      ↩ Try Again
+    </button>
+  </div>
+</div>
+
+<!-- ── RESULTS ─────────────────────────────────────────────────────────── -->
+<div id="results">
+  <div class="success-bar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+    Profile analyzed successfully
+  </div>
+
+  <!-- Profile Header -->
+  <div class="profile-header-card">
+    <div id="profile-avatar-wrap"></div>
+    <div class="profile-meta">
+      <div class="profile-name" id="res-name">—</div>
+      <div class="profile-headline" id="res-headline"></div>
+      <div class="profile-location" id="res-location-wrap" style="display:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span id="res-location"></span>
+      </div>
+      <div class="profile-actions">
+        <a class="btn-secondary" id="res-linkedin-link" href="#" target="_blank" rel="noopener" style="display:none">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+          Open on LinkedIn
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-exp">0</div>
+      <div class="stat-label">Experience</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-edu">0</div>
+      <div class="stat-label">Education</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-skills">0</div>
+      <div class="stat-label">Skills</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-cert">0</div>
+      <div class="stat-label">Certifications</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-lang">0</div>
+      <div class="stat-label">Languages</div>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="result-section" id="section-about" style="display:none">
+    <div class="section-head">
+      <div class="section-head-left">
+        <span class="section-head-icon" aria-hidden="true">📝</span>
+        <span class="section-head-title">About</span>
+      </div>
+    </div>
+    <div class="section-body">
+      <p class="about-text" id="res-about"></p>
+    </div>
+  </div>
+
+  <!-- Experience -->
+  <div class="result-section">
+    <div class="section-head">
+      <div class="section-head-left">
+        <span class="section-head-icon" aria-hidden="true">💼</span>
+        <span class="section-head-title">Experience</span>
+      </div>
+      <span class="section-head-count" id="exp-count">0</span>
+    </div>
+    <div class="section-body">
+      <div class="timeline" id="res-experience"></div>
+    </div>
+  </div>
+
+  <!-- Education -->
+  <div class="result-section">
+    <div class="section-head">
+      <div class="section-head-left">
+        <span class="section-head-icon" aria-hidden="true">🎓</span>
+        <span class="section-head-title">Education</span>
+      </div>
+      <span class="section-head-count" id="edu-count">0</span>
+    </div>
+    <div class="section-body">
+      <div class="edu-grid" id="res-education"></div>
+    </div>
+  </div>
+
+  <!-- Skills -->
+  <div class="result-section">
+    <div class="section-head">
+      <div class="section-head-left">
+        <span class="section-head-icon" aria-hidden="true">⚡</span>
+        <span class="section-head-title">Skills</span>
+      </div>
+      <span class="section-head-count" id="skills-count">0</span>
+    </div>
+    <div class="section-body">
+      <div class="skills-wrap" id="res-skills"></div>
+    </div>
+  </div>
+
+  <!-- Certifications -->
+  <div class="result-section">
+    <div class="section-head">
+      <div class="section-head-left">
+        <span class="section-head-icon" aria-hidden="true">🏆</span>
+        <span class="section-head-title">Certifications</span>
+      </div>
+      <span class="section-head-count" id="cert-count">0</span>
+    </div>
+    <div class="section-body">
+      <div class="cert-grid" id="res-certifications"></div>
+    </div>
+  </div>
+
+  <!-- Languages -->
+  <div class="result-section">
+    <div class="section-head">
+      <div class="section-head-left">
+        <span class="section-head-icon" aria-hidden="true">🌐</span>
+        <span class="section-head-title">Languages</span>
+      </div>
+      <span class="section-head-count" id="lang-count">0</span>
+    </div>
+    <div class="section-body">
+      <div class="lang-grid" id="res-languages"></div>
+    </div>
+  </div>
+
+  <!-- Raw JSON -->
+  <div class="result-section">
+    <button class="raw-json-toggle" id="raw-toggle" aria-expanded="false" aria-controls="raw-body">
+      <span>View Raw API Response</span>
+      <span class="raw-json-toggle-icon" aria-hidden="true">▼</span>
+    </button>
+    <div class="raw-json-body" id="raw-body" role="region" aria-label="Raw API response">
+      <div class="raw-json-toolbar">
+        <button class="btn-copy" id="copy-json" type="button" aria-label="Copy JSON to clipboard">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          Copy JSON
+        </button>
+      </div>
+      <pre id="raw-json" aria-label="JSON response"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ── FEATURES ────────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="section-header">
+    <div class="section-label">What you get</div>
+    <h2 class="section-title">Everything you need from a profile</h2>
+    <p class="section-sub">Structured, clean data returned as JSON — ready to use in any application.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">💼</div>
+      <div class="feature-title">Professional Experience</div>
+      <p class="feature-desc">Structured work history with roles, companies, dates and descriptions.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">🎓</div>
+      <div class="feature-title">Education</div>
+      <p class="feature-desc">Education history with institutions, degrees and fields of study.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">⚡</div>
+      <div class="feature-title">Skills</div>
+      <p class="feature-desc">Extracted list of professional skills as clean strings.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">🧩</div>
+      <div class="feature-title">Profile Data</div>
+      <p class="feature-desc">Name, headline, location, about, certifications and languages.</p>
+    </div>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<!-- ── HOW IT WORKS ────────────────────────────────────────────────────── -->
+<section id="howitworks">
+  <div class="section-header">
+    <div class="section-label">Simple process</div>
+    <h2 class="section-title">How it works</h2>
+    <p class="section-sub">Three steps from URL to structured data.</p>
+  </div>
+  <div class="steps-row">
+    <div class="step">
+      <div class="step-num" aria-hidden="true">01</div>
+      <div class="step-title">Paste</div>
+      <p class="step-desc">Copy any public LinkedIn profile URL and paste it into the input above.</p>
+    </div>
+    <div class="step">
+      <div class="step-num" aria-hidden="true">02</div>
+      <div class="step-title">Analyze</div>
+      <p class="step-desc">Click Analyze Profile and our API fetches and processes the data.</p>
+    </div>
+    <div class="step">
+      <div class="step-num" aria-hidden="true">03</div>
+      <div class="step-title">Explore</div>
+      <p class="step-desc">View structured professional information or copy the raw JSON.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ──────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-left">
+    © 2026 LinkedIn Profile API · Built with FastAPI
+  </div>
+  <div class="footer-right">
+    <a href="/docs" target="_blank" rel="noopener">API Docs</a>
+    <a href="/health" target="_blank" rel="noopener">Health</a>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ── JAVASCRIPT ───────────────────────────────────────────────────────── -->
+<script>
+(function () {
+  'use strict';
+
+  // ── DOM refs ──────────────────────────────────────────────────────────
+  const urlInput     = document.getElementById('url-input');
+  const clearBtn     = document.getElementById('input-clear');
+  const analyzeBtn   = document.getElementById('analyze-btn');
+  const urlError     = document.getElementById('url-error');
+  const loadingEl    = document.getElementById('loading');
+  const resultsEl    = document.getElementById('results');
+  const errorEl      = document.getElementById('error-state');
+  const retryBtn     = document.getElementById('retry-btn');
+  const rawToggle    = document.getElementById('raw-toggle');
+  const rawBody      = document.getElementById('raw-body');
+  const rawJsonEl    = document.getElementById('raw-json');
+  const copyJsonBtn  = document.getElementById('copy-json');
+  const toastEl      = document.getElementById('toast');
+  const hamburger    = document.getElementById('hamburger');
+  const mobileMenu   = document.getElementById('mobile-menu');
+  const btnText      = analyzeBtn.querySelector('.btn-text');
+
+  let lastRawData = null;
+  let isLoading   = false;
+
+  // ── URL Validation ────────────────────────────────────────────────────
+  const LINKEDIN_RE = /^https:\/\/([a-zA-Z0-9-]+\.)?linkedin\.com\/in\/[a-zA-Z0-9\-_%\u00C0-\u00FF]{2,100}\/?$/;
+
+  function isValidLinkedInUrl(url) {
+    return LINKEDIN_RE.test(url.trim());
+  }
+
+  function showUrlError(msg) {
+    urlError.textContent = msg;
+    urlError.classList.add('visible');
+    urlInput.setAttribute('aria-invalid', 'true');
+  }
+
+  function clearUrlError() {
+    urlError.classList.remove('visible');
+    urlInput.removeAttribute('aria-invalid');
+  }
+
+  // ── Input events ──────────────────────────────────────────────────────
+  urlInput.addEventListener('input', () => {
+    clearUrlError();
+    clearBtn.classList.toggle('visible', urlInput.value.length > 0);
+  });
+
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !isLoading) triggerAnalyze();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    urlInput.value = '';
+    clearUrlError();
+    clearBtn.classList.remove('visible');
+    urlInput.focus();
+  });
+
+  // ── Analyze ───────────────────────────────────────────────────────────
+  analyzeBtn.addEventListener('click', triggerAnalyze);
+
+  function triggerAnalyze() {
+    const url = urlInput.value.trim();
+
+    if (!url) {
+      showUrlError('Please enter a LinkedIn profile URL.');
+      urlInput.focus();
+      return;
+    }
+
+    if (!isValidLinkedInUrl(url)) {
+      showUrlError('Please enter a valid LinkedIn profile URL (e.g. https://www.linkedin.com/in/example/).');
+      urlInput.focus();
+      return;
+    }
+
+    fetchProfile(url);
+  }
+
+  async function fetchProfile(url) {
+    if (isLoading) return;
+    isLoading = true;
+
+    // Reset states
+    hideResults();
+    hideError();
+    showLoading();
+    setButtonLoading(true);
+
+    // Animate loading steps
+    const steps = [
+      document.getElementById('ls-1'),
+      document.getElementById('ls-2'),
+      document.getElementById('ls-3'),
+      document.getElementById('ls-4'),
+    ];
+    let stepIdx = 1;
+    const stepTimer = setInterval(() => {
+      if (stepIdx < steps.length) {
+        steps[stepIdx - 1].classList.remove('active');
+        steps[stepIdx - 1].classList.add('done');
+        steps[stepIdx - 1].querySelector('.loading-step-icon').textContent = '✓';
+        if (stepIdx < steps.length) {
+          steps[stepIdx].classList.add('active');
+          steps[stepIdx].querySelector('.loading-step-icon').textContent = '●';
+        }
+        stepIdx++;
+      }
+    }, 900);
+
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linkedin_url: url }),
+      });
+
+      clearInterval(stepTimer);
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const detail = data.detail || 'Unexpected error.';
+        handleApiError(res.status, detail);
+        return;
+      }
+
+      lastRawData = data;
+      renderProfile(data);
+      hideLoading();
+      showResults();
+
+    } catch (err) {
+      clearInterval(stepTimer);
+      console.error('[LinkedIn Profile API] fetch error:', err);
+      showError(
+        '⚠️',
+        'Connection failed',
+        'Could not reach the API. Please check your connection and try again.'
+      );
+    } finally {
+      setButtonLoading(false);
+      isLoading = false;
+    }
+  }
+
+  function handleApiError(status, detail) {
+    hideLoading();
+    if (status === 422 || status === 400) {
+      showError('🔗', 'Invalid LinkedIn URL', 'Please enter a valid public LinkedIn profile URL.');
+    } else if (status === 404) {
+      showError('🔍', 'Profile not found', "We couldn't retrieve this profile. It may be private or the URL may be incorrect.");
+    } else if (status === 429) {
+      showError('⏳', 'Too many requests', 'The service is temporarily rate-limited. Please wait a moment and try again.');
+    } else if (status === 503) {
+      showError('🔌', 'API unavailable', "We couldn't connect to the profile data service. Please try again shortly.");
+    } else {
+      showError('⚠️', 'Something went wrong', 'An unexpected error occurred. Please try again. ' + (detail || ''));
+    }
+  }
+
+  // ── Render Profile ────────────────────────────────────────────────────
+  function renderProfile(d) {
+    // Avatar
+    const avatarWrap = document.getElementById('profile-avatar-wrap');
+    avatarWrap.innerHTML = '';
+    if (d.profile_images && d.profile_images.profile) {
+      const img = document.createElement('img');
+      img.src = d.profile_images.profile;
+      img.className = 'avatar';
+      img.alt = d.name ? `${d.name} profile photo` : 'Profile photo';
+      img.onerror = () => { img.replaceWith(makeInitialsAvatar(d.name)); };
+      avatarWrap.appendChild(img);
+    } else {
+      avatarWrap.appendChild(makeInitialsAvatar(d.name));
+    }
+
+    // Header
+    document.getElementById('res-name').textContent = d.name || 'Unknown Name';
+    document.getElementById('res-headline').textContent = d.headline || '';
+
+    const locWrap = document.getElementById('res-location-wrap');
+    if (d.location) {
+      document.getElementById('res-location').textContent = d.location;
+      locWrap.style.display = 'inline-flex';
+    } else {
+      locWrap.style.display = 'none';
+    }
+
+    const linkedinLink = document.getElementById('res-linkedin-link');
+    if (d.profile_url) {
+      linkedinLink.href = d.profile_url;
+      linkedinLink.style.display = 'inline-flex';
+    } else {
+      linkedinLink.style.display = 'none';
+    }
+
+    // Stats
+    document.getElementById('stat-exp').textContent    = (d.experience || []).length;
+    document.getElementById('stat-edu').textContent    = (d.education || []).length;
+    document.getElementById('stat-skills').textContent = (d.skills || []).length;
+    document.getElementById('stat-cert').textContent   = (d.certifications || []).length;
+    document.getElementById('stat-lang').textContent   = (d.languages || []).length;
+
+    // About
+    const aboutSection = document.getElementById('section-about');
+    if (d.about) {
+      document.getElementById('res-about').textContent = d.about;
+      aboutSection.style.display = 'block';
+    } else {
+      aboutSection.style.display = 'none';
+    }
+
+    // Experience
+    renderExperience(d.experience || []);
+
+    // Education
+    renderEducation(d.education || []);
+
+    // Skills
+    renderSkills(d.skills || []);
+
+    // Certifications
+    renderCertifications(d.certifications || []);
+
+    // Languages
+    renderLanguages(d.languages || []);
+
+    // Raw JSON
+    rawJsonEl.textContent = JSON.stringify(d, null, 2);
+  }
+
+  function makeInitialsAvatar(name) {
+    const div = document.createElement('div');
+    div.className = 'avatar-initials';
+    div.setAttribute('aria-hidden', 'true');
+    if (name) {
+      const parts = name.trim().split(/\s+/);
+      div.textContent = parts.length >= 2
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        : parts[0].slice(0, 2).toUpperCase();
+    } else {
+      div.textContent = '?';
+    }
+    return div;
+  }
+
+  function fmtDate(d) {
+    if (!d) return 'Present';
+    // Expected format: YYYY-MM or YYYY
+    const parts = d.split('-');
+    if (parts.length >= 2) {
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const m = parseInt(parts[1], 10);
+      return `${months[m - 1] || parts[1]} ${parts[0]}`;
+    }
+    return parts[0];
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderExperience(list) {
+    const el = document.getElementById('res-experience');
+    document.getElementById('exp-count').textContent = list.length;
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💼</div>No experience information available</div>';
+      return;
+    }
+    el.innerHTML = list.map(item => `
+      <div class="timeline-item">
+        <div class="timeline-left" aria-hidden="true">
+          <div class="timeline-dot"></div>
+          <div class="timeline-line"></div>
+        </div>
+        <div class="timeline-content">
+          <div class="timeline-dates">${fmtDate(item.start_date)} — ${fmtDate(item.end_date)}</div>
+          <div class="timeline-title">${esc(item.title) || '—'}</div>
+          ${item.company ? `<div class="timeline-company">${esc(item.company)}</div>` : ''}
+          ${item.location ? `<div class="timeline-location">${esc(item.location)}</div>` : ''}
+          ${item.description ? `<div class="timeline-desc">${esc(item.description)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderEducation(list) {
+    const el = document.getElementById('res-education');
+    document.getElementById('edu-count').textContent = list.length;
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎓</div>No education information available</div>';
+      return;
+    }
+    el.innerHTML = list.map(item => `
+      <div class="edu-card">
+        <div class="edu-institution">${esc(item.institution) || '—'}</div>
+        ${item.degree ? `<div class="edu-degree">${esc(item.degree)}${item.field_of_study ? ' · ' + esc(item.field_of_study) : ''}</div>` : ''}
+        ${(item.start_date || item.end_date) ? `<div class="edu-dates">${fmtDate(item.start_date)} — ${fmtDate(item.end_date)}</div>` : ''}
+        ${item.description ? `<div class="timeline-desc" style="margin-top:6px">${esc(item.description)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderSkills(list) {
+    const el = document.getElementById('res-skills');
+    document.getElementById('skills-count').textContent = list.length;
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚡</div>No skills listed</div>';
+      return;
+    }
+    el.innerHTML = list.map(s => `<span class="skill-pill">${esc(s)}</span>`).join('');
+  }
+
+  function renderCertifications(list) {
+    const el = document.getElementById('res-certifications');
+    document.getElementById('cert-count').textContent = list.length;
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏆</div>No certifications listed</div>';
+      return;
+    }
+    el.innerHTML = list.map(item => `
+      <div class="cert-card">
+        <div>
+          <div class="cert-name">${esc(item.name) || '—'}</div>
+          ${item.issuer ? `<div class="cert-issuer">${esc(item.issuer)}</div>` : ''}
+          ${item.credential_url ? `<a class="cert-link" href="${esc(item.credential_url)}" target="_blank" rel="noopener">View ↗</a>` : ''}
+        </div>
+        <div class="cert-dates">
+          ${item.issue_date ? fmtDate(item.issue_date) : ''}
+          ${item.expiration_date ? ' – ' + fmtDate(item.expiration_date) : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderLanguages(list) {
+    const el = document.getElementById('res-languages');
+    document.getElementById('lang-count').textContent = list.length;
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🌐</div>No languages listed</div>';
+      return;
+    }
+    el.innerHTML = list.map(item => `
+      <div class="lang-card">
+        <div class="lang-name">${esc(item.name) || '—'}</div>
+        ${item.proficiency ? `<div class="lang-prof">${esc(item.proficiency)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── State management ──────────────────────────────────────────────────
+  function showLoading() {
+    loadingEl.classList.add('visible');
+    loadingEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Reset steps
+    ['ls-1','ls-2','ls-3','ls-4'].forEach((id, i) => {
+      const el = document.getElementById(id);
+      el.classList.remove('done','active');
+      el.querySelector('.loading-step-icon').textContent = '○';
+    });
+    document.getElementById('ls-1').classList.add('done');
+    document.getElementById('ls-1').querySelector('.loading-step-icon').textContent = '✓';
+    document.getElementById('ls-2').classList.add('active');
+    document.getElementById('ls-2').querySelector('.loading-step-icon').textContent = '●';
+  }
+
+  function hideLoading() { loadingEl.classList.remove('visible'); }
+
+  function showResults() {
+    resultsEl.classList.add('visible');
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function hideResults() { resultsEl.classList.remove('visible'); }
+
+  function showError(icon, title, message) {
+    hideLoading();
+    document.getElementById('error-icon').textContent = icon;
+    document.getElementById('error-title').textContent = title;
+    document.getElementById('error-message').textContent = message;
+    errorEl.classList.add('visible');
+    errorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function hideError() { errorEl.classList.remove('visible'); }
+
+  function setButtonLoading(on) {
+    analyzeBtn.disabled = on;
+    analyzeBtn.classList.toggle('loading', on);
+    btnText.textContent = on ? 'Analyzing…' : 'Analyze Profile';
+  }
+
+  // ── Retry ─────────────────────────────────────────────────────────────
+  retryBtn.addEventListener('click', () => {
+    hideError();
+    urlInput.focus();
+    urlInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  // ── Raw JSON toggle ───────────────────────────────────────────────────
+  rawToggle.addEventListener('click', () => {
+    const open = rawBody.classList.toggle('open');
+    rawToggle.classList.toggle('open', open);
+    rawToggle.setAttribute('aria-expanded', open);
+  });
+
+  // ── Copy JSON ─────────────────────────────────────────────────────────
+  copyJsonBtn.addEventListener('click', async () => {
+    if (!lastRawData) return;
+    const text = JSON.stringify(lastRawData, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      copyJsonBtn.classList.add('copied');
+      copyJsonBtn.querySelector('svg + text, svg').nextSibling.textContent = ' Copied!';
+      copyJsonBtn.childNodes.forEach(n => {
+        if (n.nodeType === 3) n.textContent = ' Copied!';
+      });
+      // find text node
+      [...copyJsonBtn.childNodes].forEach(n => { if (n.nodeType === 3) n.textContent = ' Copied!'; });
+      showToast('✓ Copied to clipboard');
+      setTimeout(() => {
+        copyJsonBtn.classList.remove('copied');
+        [...copyJsonBtn.childNodes].forEach(n => { if (n.nodeType === 3) n.textContent = ' Copy JSON'; });
+      }, 2000);
+    } catch (e) {
+      console.error('[Copy]', e);
+      showToast('⚠ Copy failed — please copy manually');
+    }
+  });
+
+  // ── Toast ─────────────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2500);
+  }
+
+  // ── API Status ────────────────────────────────────────────────────────
+  async function checkApiStatus() {
+    const dots = [
+      document.getElementById('nav-status-dot'),
+      document.getElementById('mobile-status-dot'),
+    ];
+    const texts = [
+      document.getElementById('nav-status-text'),
+      document.getElementById('mobile-status-text'),
+      document.getElementById('hero-api-status-text'),
+    ];
+    try {
+      const res = await fetch('/health', { cache: 'no-store' });
+      const ok = res.ok;
+      dots.forEach(d => { d.className = 'status-dot ' + (ok ? 'online' : 'offline'); });
+      texts.forEach(t => { if (t) t.textContent = ok ? 'API Operational' : 'API Offline'; });
+    } catch {
+      dots.forEach(d => { d.className = 'status-dot offline'; });
+      texts.forEach(t => { if (t) t.textContent = 'API Offline'; });
+    }
+  }
+
+  checkApiStatus();
+  // Re-check once after 60s — do not poll aggressively
+  setTimeout(checkApiStatus, 60000);
+
+  // ── Mobile Menu ───────────────────────────────────────────────────────
+  hamburger.addEventListener('click', () => {
+    const open = mobileMenu.classList.toggle('open');
+    hamburger.setAttribute('aria-expanded', open);
+  });
+
+  // Close mobile menu when a link is clicked
+  mobileMenu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      mobileMenu.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', false);
+    });
+  });
+
+  // Close mobile menu on outside click
+  document.addEventListener('click', (e) => {
+    if (!mobileMenu.contains(e.target) && !hamburger.contains(e.target)) {
+      mobileMenu.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', false);
+    }
+  });
+
+  // ── Navbar active link ────────────────────────────────────────────────
+  const navLinks = document.querySelectorAll('.nav-links a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      }
+    });
+  }, { threshold: 0.4 });
+
+  ['home', 'features', 'howitworks'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+
+})();
+</script>
+</body>
+</html>
