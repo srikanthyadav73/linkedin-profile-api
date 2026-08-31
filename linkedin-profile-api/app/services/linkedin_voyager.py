@@ -226,15 +226,10 @@ async def _parse_basic_profile(
 def _parse_dash_payload(payload: dict, linkedin_url: str, username: str) -> ProfileResponse:
     """
     Parse the new LinkedIn Dash API response format.
-    The Dash endpoint returns data in 'elements' list or 'included' list.
+    Data is in 'included' array; each entity has a $type field.
+    Education uses 'dateRange' (not 'timePeriod').
     """
-    elements = payload.get("elements", [])
     included = payload.get("included", [])
-
-    # Get the main profile element
-    profile_data = {}
-    if elements:
-        profile_data = elements[0] if isinstance(elements[0], dict) else {}
 
     # Index included entities by type
     entities_by_type: dict[str, list[dict]] = {}
@@ -242,83 +237,83 @@ def _parse_dash_payload(payload: dict, linkedin_url: str, username: str) -> Prof
         t = item.get("$type", "")
         entities_by_type.setdefault(t, []).append(item)
 
-    # Basic info
+    # Get main Profile entity
+    profile_data = {}
+    for key in ["com.linkedin.voyager.dash.identity.profile.Profile",
+                "com.linkedin.voyager.identity.profile.Profile"]:
+        if key in entities_by_type:
+            # Find the one matching our username
+            for p in entities_by_type[key]:
+                if p.get("publicIdentifier") == username:
+                    profile_data = p
+                    break
+            if not profile_data and entities_by_type[key]:
+                profile_data = entities_by_type[key][0]
+            break
+
     first_name = profile_data.get("firstName", "")
     last_name = profile_data.get("lastName", "")
     full_name = f"{first_name} {last_name}".strip()
-    if not full_name:
-        full_name = profile_data.get("name")
-
     headline = profile_data.get("headline")
     location = profile_data.get("locationName") or profile_data.get("geoLocationName")
     about = profile_data.get("summary")
 
-    # Profile image
     photo_url = _extract_photo(profile_data)
 
-    # Experience - look in both profileData and included
+    # Experience — Dash uses 'dateRange' key
     experiences: list[Experience] = []
-    raw_positions = (
-        _get_from_view(profile_data, "positionView")
-        or _find_by_type(entities_by_type, ["Position"])
-    )
+    raw_positions = _find_by_type(entities_by_type, ["Position"])
     for pos in raw_positions:
-        tp = pos.get("timePeriod", {})
+        dr = pos.get("dateRange") or pos.get("timePeriod") or {}
+        start = dr.get("start") or {}
+        end = dr.get("end") or {}
         experiences.append(Experience(
             title=pos.get("title"),
             company=pos.get("companyName"),
             location=pos.get("locationName"),
-            start_date=_format_date(tp.get("startDate")),
-            end_date=_format_date(tp.get("endDate")),
+            start_date=_format_date(start),
+            end_date=_format_date(end),
             description=pos.get("description"),
         ))
 
-    # Education
+    # Education — Dash uses 'dateRange' key
     education: list[Education] = []
-    raw_edu = (
-        _get_from_view(profile_data, "educationView")
-        or _find_by_type(entities_by_type, ["Education"])
-    )
+    raw_edu = _find_by_type(entities_by_type, ["Education"])
     for edu in raw_edu:
-        tp = edu.get("timePeriod", {})
-        school = (
-            edu.get("schoolName")
-            or edu.get("school")
-            or (edu.get("schoolResolutionResult") or {}).get("name")
-        )
-        degree = edu.get("degreeName") or edu.get("degree")
+        dr = edu.get("dateRange") or edu.get("timePeriod") or {}
+        start = dr.get("start") or {}
+        end = dr.get("end") or {}
+        school = edu.get("schoolName")
+        degree = edu.get("degreeName")
         field = edu.get("fieldOfStudy")
         if school or degree or field:
             education.append(Education(
                 institution=school,
                 degree=degree,
                 field_of_study=field,
-                start_date=_format_date(tp.get("startDate")),
-                end_date=_format_date(tp.get("endDate")),
+                start_date=_format_date(start),
+                end_date=_format_date(end),
                 description=edu.get("description"),
             ))
 
     # Skills
     skills: list[str] = []
-    raw_skills = (
-        _get_from_view(profile_data, "skillView")
-        or _find_by_type(entities_by_type, ["Skill"])
-    )
+    raw_skills = _find_by_type(entities_by_type, ["Skill"])
     for s in raw_skills:
         name = s.get("name") or (s.get("skill") or {}).get("name")
         if name and name not in skills:
             skills.append(name)
 
-    # Certifications
+    # Certifications — Dash uses 'dateRange'
     certifications: list[Certification] = []
     raw_certs = _find_by_type(entities_by_type, ["Certification"])
     for c in raw_certs:
-        tp = c.get("timePeriod", {})
+        dr = c.get("dateRange") or c.get("timePeriod") or {}
         certifications.append(Certification(
             name=c.get("name"),
             issuer=c.get("authority"),
-            issue_date=_format_date(tp.get("startDate")),
-            expiration_date=_format_date(tp.get("endDate")),
+            issue_date=_format_date(dr.get("start") or {}),
+            expiration_date=_format_date(dr.get("end") or {}),
             credential_id=c.get("licenseNumber"),
             credential_url=c.get("url"),
         ))
@@ -345,6 +340,8 @@ def _parse_dash_payload(payload: dict, linkedin_url: str, username: str) -> Prof
         certifications=certifications,
         languages=languages,
     )
+
+
 
 
 def _parse_voyager_payload(payload: dict, linkedin_url: str) -> ProfileResponse:
