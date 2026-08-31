@@ -22,7 +22,14 @@ class Settings(BaseSettings):
     with a confusing bug.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # On Render (and any production host) there is no .env file —
+        # variables come from the host environment directly.
+        # env_file missing is fine; real env vars always take precedence.
+    )
 
     # General app settings
     app_name: str = "LinkedIn Profile API"
